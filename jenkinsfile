@@ -1,0 +1,83 @@
+pipeline {
+    agent any
+      environment { 
+        cc = 'clang'
+     dockerpass = credentials('docker2')
+    }
+    options { 
+        buildDiscarder(logRotator(numToKeepStr: '5'))
+        timeout(time: 10, unit: 'MINUTES')
+        timestamps()
+    }
+    triggers { 
+        upstream(upstreamProjects: 'job1,job2', threshold: hudson.model.Result.SUCCESS) 
+    }
+        
+         
+     stages {
+          stage('Parallel Stage') {
+               parallel {
+        stage('first stage'){
+               steps{
+                script{
+        
+                    sh" hostname"
+                     sh 'docker login -u $dockerpass_USR -p $dockerpass_PSW'
+                     
+                     
+                      
+                }               
+            
+            }  
+            
+        }
+        stage('second  stage'){
+            agent  {
+         docker {
+            image 'java:openjdk-7u111-alpine'
+        }
+    }
+      environment { 
+               project = "jenkins.demo"
+    }
+            steps{
+                script{
+    
+                    sh"hostname"
+                    sh"java -version"
+                    sh "printenv"
+                }
+            }
+        }
+               }
+        }
+        stage('third stage'){
+            
+                      input {
+                message "Should we continue?"
+                ok "Yes, we should."
+                submitter "alice,bob"
+                parameters {
+                    string(name: 'PERSON', defaultValue: 'yes', description: 'Who should I say hello to?')
+                }
+            }
+            steps{
+                script{
+                 sh "echo $PERSON"           
+                    sh"echo $BUILD_NUMBER > test.txt"
+                    sh "echo $NODE_NAME >> test.txt"
+                    currentBuild.description = "node on which job excute" + env.NODE_NAME
+                    
+                }               
+            
+            } 
+            
+        }
+     }
+     post {
+        success{
+            archiveArtifacts artifacts: 'test.txt', followSymlinks: false
+        }
+     }
+       
+}   
